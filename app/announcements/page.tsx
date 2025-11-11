@@ -1,23 +1,68 @@
 "use client"
-
-import type React from "react"
-
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { announcements } from "@/lib/mock-data"
+import { helpRequestPosts } from "@/lib/mock-data"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Megaphone, AlertTriangle, TrendingUp, HelpCircle, Clock, User, Heart, MessageCircle } from "lucide-react"
+import {
+  Megaphone,
+  Package,
+  Heart,
+  MessageSquare,
+  CheckCircle,
+  Plus,
+  MapPin,
+  Clock,
+  AlertCircle,
+  X,
+  Send,
+} from "lucide-react"
 
-type AnnouncementType = "Alert" | "Update" | "Request"
+type Category = "Supply Need" | "Donation Request" | "Volunteer Support" | "Medical Aid" | "Logistics"
+type Status = "Needs Help" | "Completed"
+type Urgency = "Low" | "Medium" | "High" | "Critical"
 
-export default function AnnouncementsPage() {
-  const { isAuthenticated } = useAuth()
+interface Post {
+  id: string
+  groupName: string
+  groupId: string
+  title: string
+  category: Category
+  description: string
+  location: string
+  urgency: Urgency
+  status: Status
+  image?: string
+  timestamp: Date
+  comments: Array<{
+    id: string
+    userName: string
+    message: string
+    timestamp: Date
+  }>
+}
+
+export default function CommunityFeedPage() {
+  const { isAuthenticated, user } = useAuth()
   const router = useRouter()
-  const [filterType, setFilterType] = useState<string>("all")
+  const [posts, setPosts] = useState<Post[]>(helpRequestPosts)
+  const [filterCategory, setFilterCategory] = useState<string>("all")
+  const [filterStatus, setFilterStatus] = useState<string>("all")
+  const [sortBy, setSortBy] = useState<string>("recent")
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set())
+  const [newComments, setNewComments] = useState<Record<string, string>>({})
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set())
+
+  const [formData, setFormData] = useState({
+    title: "",
+    category: "Supply Need" as Category,
+    description: "",
+    location: "",
+    urgency: "Medium" as Urgency,
+  })
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -25,46 +70,103 @@ export default function AnnouncementsPage() {
     }
   }, [isAuthenticated, router])
 
-  const filteredAnnouncements =
-    filterType === "all" ? announcements : announcements.filter((a) => a.type === filterType)
+  const getFilteredAndSortedPosts = () => {
+    let filtered = [...posts]
 
-  const getTypeIcon = (type: AnnouncementType) => {
-    const icons: Record<AnnouncementType, React.ReactNode> = {
-      Alert: <AlertTriangle className="h-5 w-5" />,
-      Update: <TrendingUp className="h-5 w-5" />,
-      Request: <HelpCircle className="h-5 w-5" />,
+    if (filterCategory !== "all") {
+      filtered = filtered.filter((p) => p.category === filterCategory)
     }
-    return icons[type] || <Megaphone className="h-5 w-5" />
+
+    if (filterStatus !== "all") {
+      filtered = filtered.filter((p) => p.status === filterStatus)
+    }
+
+    // Sort
+    if (sortBy === "recent") {
+      filtered.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+    } else if (sortBy === "comments") {
+      filtered.sort((a, b) => b.comments.length - a.comments.length)
+    } else if (sortBy === "urgency") {
+      const urgencyOrder = { Critical: 0, High: 1, Medium: 2, Low: 3 }
+      filtered.sort(
+        (a, b) =>
+          urgencyOrder[a.urgency as keyof typeof urgencyOrder] - urgencyOrder[b.urgency as keyof typeof urgencyOrder],
+      )
+    }
+
+    return filtered
   }
 
-  const getTypeColor = (type: AnnouncementType) => {
-    const colors: Record<AnnouncementType, string> = {
-      Alert: "bg-red-100 text-red-800",
-      Update: "bg-blue-100 text-blue-800",
-      Request: "bg-amber-100 text-amber-800",
+  const handleCreatePost = () => {
+    if (!formData.title || !formData.description) {
+      alert("Please fill in all fields")
+      return
     }
-    return colors[type] || "bg-gray-100 text-gray-800"
-  }
 
-  const getTypeBgColor = (type: AnnouncementType) => {
-    const colors: Record<AnnouncementType, string> = {
-      Alert: "bg-red-100/50",
-      Update: "bg-blue-100/50",
-      Request: "bg-amber-100/50",
+    const newPost: Post = {
+      id: String(posts.length + 1),
+      groupName: user?.name || "Anonymous",
+      groupId: "1",
+      title: formData.title,
+      category: formData.category,
+      description: formData.description,
+      location: formData.location || user?.assignedArea || "Unknown",
+      urgency: formData.urgency,
+      status: "Needs Help",
+      timestamp: new Date(),
+      comments: [],
     }
-    return colors[type] || "bg-gray-100/50"
-  }
 
-  const handleLike = (id: string) => {
-    setLikedPosts((prev) => {
-      const newSet = new Set(prev)
-      if (newSet.has(id)) {
-        newSet.delete(id)
-      } else {
-        newSet.add(id)
-      }
-      return newSet
+    setPosts([newPost, ...posts])
+    setShowCreateModal(false)
+    setFormData({
+      title: "",
+      category: "Supply Need",
+      description: "",
+      location: "",
+      urgency: "Medium",
     })
+  }
+
+  const handleMarkCompleted = (postId: string) => {
+    setPosts(posts.map((p) => (p.id === postId ? { ...p, status: "Completed" } : p)))
+  }
+
+  const handleAddComment = (postId: string) => {
+    const comment = newComments[postId]
+    if (!comment?.trim()) return
+
+    setPosts(
+      posts.map((p) => {
+        if (p.id === postId) {
+          return {
+            ...p,
+            comments: [
+              ...p.comments,
+              {
+                id: `c${Date.now()}`,
+                userName: user?.name || "Anonymous",
+                message: comment,
+                timestamp: new Date(),
+              },
+            ],
+          }
+        }
+        return p
+      }),
+    )
+
+    setNewComments({ ...newComments, [postId]: "" })
+  }
+
+  const toggleComments = (postId: string) => {
+    const newSet = new Set(expandedComments)
+    if (newSet.has(postId)) {
+      newSet.delete(postId)
+    } else {
+      newSet.add(postId)
+    }
+    setExpandedComments(newSet)
   }
 
   const getTimeAgo = (date: Date) => {
@@ -79,163 +181,357 @@ export default function AnnouncementsPage() {
     return `${days}d ago`
   }
 
+  const getCategoryColor = (category: Category): string => {
+    const colors: Record<Category, string> = {
+      "Supply Need": "bg-blue-100 text-blue-800",
+      "Donation Request": "bg-green-100 text-green-800",
+      "Volunteer Support": "bg-purple-100 text-purple-800",
+      "Medical Aid": "bg-red-100 text-red-800",
+      Logistics: "bg-orange-100 text-orange-800",
+    }
+    return colors[category] || "bg-gray-100 text-gray-800"
+  }
+
+  const getUrgencyColor = (urgency: Urgency): string => {
+    const colors: Record<Urgency, string> = {
+      Critical: "bg-red-600 text-white",
+      High: "bg-orange-500 text-white",
+      Medium: "bg-yellow-500 text-white",
+      Low: "bg-green-500 text-white",
+    }
+    return colors[urgency] || "bg-gray-500 text-white"
+  }
+
+  const filteredPosts = getFilteredAndSortedPosts()
+
   return (
     <main className="min-h-screen bg-background p-4 md:p-6">
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-5xl mx-auto space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">Community Feed</h1>
-          <p className="text-muted-foreground">
-            Stay updated with official announcements and volunteer community messages.
-          </p>
-        </div>
-
-        {/* Type Filter */}
-        <div className="bg-card p-4 rounded-lg border border-border">
-          <label className="block text-sm font-medium text-foreground mb-3">Filter by Type</label>
-          <div className="flex flex-wrap gap-2">
-            {["all", "Alert", "Update", "Request"].map((type) => (
-              <button
-                key={type}
-                onClick={() => setFilterType(type)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-                  filterType === type
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-                }`}
-              >
-                {type === "all" ? (
-                  <>
-                    <Megaphone className="h-4 w-4" />
-                    All Posts
-                  </>
-                ) : type === "Alert" ? (
-                  <>
-                    <AlertTriangle className="h-4 w-4" />
-                    Alerts
-                  </>
-                ) : type === "Update" ? (
-                  <>
-                    <TrendingUp className="h-4 w-4" />
-                    Updates
-                  </>
-                ) : (
-                  <>
-                    <HelpCircle className="h-4 w-4" />
-                    Requests
-                  </>
-                )}
-              </button>
-            ))}
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">Community Feed</h1>
+            <p className="text-muted-foreground">
+              Volunteer Support Hub - Post help requests and collaborate with field teams
+            </p>
           </div>
         </div>
 
-        {/* Feed */}
-        <div className="space-y-4">
-          {filteredAnnouncements.length > 0 ? (
-            filteredAnnouncements.map((post) => (
-              <Card
-                key={post.id}
-                className={`border-2 transition-all hover:shadow-lg ${getTypeBgColor(post.type as AnnouncementType)}`}
+        {/* Filters and Sort */}
+        <div className="bg-card p-4 md:p-6 rounded-lg border border-border space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Category Filter */}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">Filter by Category</label>
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
               >
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-4 mb-2">
+                <option value="all">All Categories</option>
+                <option value="Supply Need">Supply Need</option>
+                <option value="Donation Request">Donation Request</option>
+                <option value="Volunteer Support">Volunteer Support</option>
+                <option value="Medical Aid">Medical Aid</option>
+                <option value="Logistics">Logistics</option>
+              </select>
+            </div>
+
+            {/* Status Filter */}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">Filter by Status</label>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
+              >
+                <option value="all">All Posts</option>
+                <option value="Needs Help">Needs Help</option>
+                <option value="Completed">Completed</option>
+              </select>
+            </div>
+
+            {/* Sort */}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">Sort by</label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
+              >
+                <option value="recent">Most Recent</option>
+                <option value="comments">Most Comments</option>
+                <option value="urgency">Highest Urgency</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Posts Feed */}
+        <div className="space-y-4">
+          {filteredPosts.length > 0 ? (
+            filteredPosts.map((post) => (
+              <Card key={post.id} className="border-2 border-border overflow-hidden hover:shadow-lg transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between gap-4 mb-3">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge className={getTypeColor(post.type as AnnouncementType)}>
-                          {getTypeIcon(post.type as AnnouncementType)}
-                          <span className="ml-1">{post.type}</span>
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <Badge className={getCategoryColor(post.category)}>
+                          <Package className="h-3 w-3 mr-1" />
+                          {post.category}
+                        </Badge>
+                        <Badge className={getUrgencyColor(post.urgency)}>
+                          {post.urgency === "Critical" && <AlertCircle className="h-3 w-3 mr-1" />}
+                          {post.urgency}
+                        </Badge>
+                        <Badge
+                          variant={post.status === "Completed" ? "default" : "outline"}
+                          className={
+                            post.status === "Completed" ? "bg-green-600 text-white" : "border-amber-500 text-amber-700"
+                          }
+                        >
+                          {post.status === "Completed" ? (
+                            <>
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Completed
+                            </>
+                          ) : (
+                            <>
+                              <AlertCircle className="h-3 w-3 mr-1" />
+                              Needs Help
+                            </>
+                          )}
                         </Badge>
                       </div>
-                      <CardTitle className="text-lg">{post.title}</CardTitle>
+                      <CardTitle className="text-lg md:text-xl">{post.title}</CardTitle>
                     </div>
                     <Badge variant="outline" className="whitespace-nowrap">
                       <Clock className="h-3 w-3 mr-1" />
                       {getTimeAgo(post.timestamp)}
                     </Badge>
                   </div>
-                  <CardDescription className="flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    {post.author}
+
+                  <CardDescription className="flex flex-wrap items-center gap-4">
+                    <span className="font-semibold text-foreground">{post.groupName}</span>
+                    <span className="flex items-center gap-1 text-muted-foreground">
+                      <MapPin className="h-4 w-4" />
+                      {post.location}
+                    </span>
                   </CardDescription>
                 </CardHeader>
 
                 <CardContent className="space-y-4">
-                  <p className="text-foreground leading-relaxed">{post.content}</p>
+                  {/* Description */}
+                  <p className="text-foreground leading-relaxed">{post.description}</p>
+
+                  {/* Image if available */}
+                  {post.image && (
+                    <img
+                      src={post.image || "/placeholder.svg"}
+                      alt={post.title}
+                      className="w-full h-48 object-cover rounded-lg border border-border"
+                    />
+                  )}
 
                   {/* Action Buttons */}
-                  <div className="flex items-center gap-3 pt-3 border-t border-border">
+                  <div className="flex items-center gap-3 pt-3 border-t border-border flex-wrap">
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleLike(post.id)}
+                      onClick={() => {
+                        const newSet = new Set(likedPosts)
+                        if (newSet.has(post.id)) {
+                          newSet.delete(post.id)
+                        } else {
+                          newSet.add(post.id)
+                        }
+                        setLikedPosts(newSet)
+                      }}
                       className={`gap-2 ${
-                        likedPosts.has(post.id) ? "text-primary" : "text-muted-foreground hover:text-primary"
+                        likedPosts.has(post.id) ? "text-red-600" : "text-muted-foreground hover:text-red-600"
                       }`}
                     >
                       <Heart className="h-4 w-4" fill={likedPosts.has(post.id) ? "currentColor" : "none"} />
-                      <span className="text-xs">Like</span>
+                      <span className="text-xs">Support</span>
                     </Button>
-                    <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground">
-                      <MessageCircle className="h-4 w-4" />
-                      <span className="text-xs">Reply</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleComments(post.id)}
+                      className="gap-2 text-muted-foreground hover:text-foreground"
+                    >
+                      <MessageSquare className="h-4 w-4" />
+                      <span className="text-xs">{post.comments.length} Comments</span>
                     </Button>
-                    {(post.type === "Alert" || post.type === "Request") && (
-                      <Button variant="outline" size="sm" className="ml-auto gap-2 bg-transparent">
-                        {post.type === "Request" ? "Help" : "Acknowledge"}
+                    {post.status === "Needs Help" && (
+                      <Button
+                        size="sm"
+                        onClick={() => handleMarkCompleted(post.id)}
+                        className="ml-auto gap-2 bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                        Mark Completed
                       </Button>
                     )}
                   </div>
+
+                  {/* Comments Section */}
+                  {expandedComments.has(post.id) && (
+                    <div className="pt-4 border-t border-border space-y-3">
+                      <div className="max-h-64 overflow-y-auto space-y-3">
+                        {post.comments.map((comment) => (
+                          <div key={comment.id} className="bg-muted/50 p-3 rounded-lg">
+                            <div className="flex items-start justify-between mb-1">
+                              <p className="font-medium text-sm text-foreground">{comment.userName}</p>
+                              <span className="text-xs text-muted-foreground">{getTimeAgo(comment.timestamp)}</span>
+                            </div>
+                            <p className="text-sm text-foreground">{comment.message}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {post.status === "Needs Help" && (
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="Add your offer or comment..."
+                            value={newComments[post.id] || ""}
+                            onChange={(e) =>
+                              setNewComments({
+                                ...newComments,
+                                [post.id]: e.target.value,
+                              })
+                            }
+                            className="flex-1 px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm"
+                            onKeyPress={(e) => {
+                              if (e.key === "Enter") {
+                                handleAddComment(post.id)
+                              }
+                            }}
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => handleAddComment(post.id)}
+                            className="bg-primary hover:bg-primary/90"
+                          >
+                            <Send className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))
           ) : (
             <div className="text-center py-12">
               <Megaphone className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No announcements in this category.</p>
+              <p className="text-muted-foreground">No posts match your filters.</p>
             </div>
           )}
         </div>
+      </div>
 
-        {/* Info Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
-          <Card className="border border-border bg-alert/5">
-            <CardContent className="pt-6">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="h-6 w-6 text-red-600 flex-shrink-0 mt-1" />
-                <div>
-                  <p className="font-semibold text-foreground mb-1">Emergency Alerts</p>
-                  <p className="text-xs text-muted-foreground">Critical safety information about disaster zones</p>
-                </div>
+      {/* Floating Action Button */}
+      <button
+        onClick={() => setShowCreateModal(true)}
+        className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-primary hover:bg-primary/90 text-white shadow-lg flex items-center justify-center transition-transform hover:scale-110"
+      >
+        <Plus className="h-6 w-6" />
+      </button>
+
+      {/* Create Post Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <CardTitle>Create Help Request</CardTitle>
+              <button onClick={() => setShowCreateModal(false)}>
+                <X className="h-5 w-5" />
+              </button>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              {/* Title */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Title</label>
+                <input
+                  type="text"
+                  placeholder="e.g., Need medical supplies urgently"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
+                />
               </div>
-            </CardContent>
-          </Card>
 
-          <Card className="border border-border bg-info/5">
-            <CardContent className="pt-6">
-              <div className="flex items-start gap-3">
-                <TrendingUp className="h-6 w-6 text-blue-600 flex-shrink-0 mt-1" />
-                <div>
-                  <p className="font-semibold text-foreground mb-1">Updates</p>
-                  <p className="text-xs text-muted-foreground">Relief operations status and center availability</p>
-                </div>
+              {/* Category */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Category</label>
+                <select
+                  value={formData.category}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value as Category })}
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
+                >
+                  <option value="Supply Need">Supply Need</option>
+                  <option value="Donation Request">Donation Request</option>
+                  <option value="Volunteer Support">Volunteer Support</option>
+                  <option value="Medical Aid">Medical Aid</option>
+                  <option value="Logistics">Logistics</option>
+                </select>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card className="border border-border bg-warning/5">
-            <CardContent className="pt-6">
-              <div className="flex items-start gap-3">
-                <HelpCircle className="h-6 w-6 text-amber-600 flex-shrink-0 mt-1" />
-                <div>
-                  <p className="font-semibold text-foreground mb-1">Requests</p>
-                  <p className="text-xs text-muted-foreground">Help needed from volunteer community</p>
-                </div>
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Description</label>
+                <textarea
+                  placeholder="Provide details about what you need..."
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows={4}
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground resize-none"
+                />
+              </div>
+
+              {/* Location */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Location</label>
+                <input
+                  type="text"
+                  placeholder="Leave blank to use your assigned area"
+                  value={formData.location}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
+                />
+              </div>
+
+              {/* Urgency */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Urgency Level</label>
+                <select
+                  value={formData.urgency}
+                  onChange={(e) => setFormData({ ...formData, urgency: e.target.value as Urgency })}
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
+                >
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                  <option value="Critical">Critical</option>
+                </select>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 justify-end pt-4">
+                <Button variant="outline" onClick={() => setShowCreateModal(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleCreatePost} className="bg-primary hover:bg-primary/90">
+                  Post Request
+                </Button>
               </div>
             </CardContent>
           </Card>
         </div>
-      </div>
+      )}
     </main>
   )
 }

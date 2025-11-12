@@ -18,6 +18,7 @@ import {
   AlertCircle,
   X,
   Send,
+  DollarSign,
 } from "lucide-react"
 
 type Category = "Supply Need" | "Donation Request" | "Volunteer Support" | "Medical Aid" | "Logistics"
@@ -42,6 +43,8 @@ interface Post {
     message: string
     timestamp: Date
   }>
+  donationsReceived?: number
+  totalDonationAmount?: number
 }
 
 export default function CommunityFeedPage() {
@@ -55,6 +58,10 @@ export default function CommunityFeedPage() {
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set())
   const [newComments, setNewComments] = useState<Record<string, string>>({})
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set())
+  const [showDonateModal, setShowDonateModal] = useState(false)
+  const [selectedPostForDonation, setSelectedPostForDonation] = useState<Post | null>(null)
+  const [donationAmount, setDonationAmount] = useState("")
+  const [donationMethod, setDonationMethod] = useState("Mobile Money")
 
   const [formData, setFormData] = useState({
     title: "",
@@ -115,6 +122,8 @@ export default function CommunityFeedPage() {
       status: "Needs Help",
       timestamp: new Date(),
       comments: [],
+      donationsReceived: 0,
+      totalDonationAmount: 0,
     }
 
     setPosts([newPost, ...posts])
@@ -157,6 +166,46 @@ export default function CommunityFeedPage() {
     )
 
     setNewComments({ ...newComments, [postId]: "" })
+  }
+
+  const handleDonateToPost = () => {
+    if (!selectedPostForDonation || !donationAmount) {
+      alert("Please enter a donation amount")
+      return
+    }
+
+    const amount = Number.parseFloat(donationAmount)
+    if (isNaN(amount) || amount <= 0) {
+      alert("Please enter a valid amount")
+      return
+    }
+
+    // Update the post with new donation data
+    setPosts(
+      posts.map((p) => {
+        if (p.id === selectedPostForDonation.id) {
+          return {
+            ...p,
+            donationsReceived: (p.donationsReceived || 0) + 1,
+            totalDonationAmount: (p.totalDonationAmount || 0) + amount,
+          }
+        }
+        return p
+      }),
+    )
+
+    alert(
+      `Donation of ${amount} via ${donationMethod} has been recorded and will be processed to ${selectedPostForDonation.groupName}`,
+    )
+    setShowDonateModal(false)
+    setDonationAmount("")
+    setDonationMethod("Mobile Money")
+    setSelectedPostForDonation(null)
+  }
+
+  const openDonateModal = (post: Post) => {
+    setSelectedPostForDonation(post)
+    setShowDonateModal(true)
   }
 
   const toggleComments = (postId: string) => {
@@ -333,6 +382,20 @@ export default function CommunityFeedPage() {
                     />
                   )}
 
+                  {post.category === "Donation Request" && (
+                    <div className="bg-green-50 border border-green-200 p-3 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-green-800">Donations Received</p>
+                          <p className="text-lg font-bold text-green-600">
+                            {post.donationsReceived || 0} donations - {(post.totalDonationAmount || 0).toLocaleString()}{" "}
+                            total
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Action Buttons */}
                   <div className="flex items-center gap-3 pt-3 border-t border-border flex-wrap">
                     <Button
@@ -363,6 +426,16 @@ export default function CommunityFeedPage() {
                       <MessageSquare className="h-4 w-4" />
                       <span className="text-xs">{post.comments.length} Comments</span>
                     </Button>
+                    {post.category === "Donation Request" && post.status === "Needs Help" && (
+                      <Button
+                        size="sm"
+                        onClick={() => openDonateModal(post)}
+                        className="gap-2 bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        <DollarSign className="h-4 w-4" />
+                        Donate
+                      </Button>
+                    )}
                     {post.status === "Needs Help" && (
                       <Button
                         size="sm"
@@ -526,6 +599,83 @@ export default function CommunityFeedPage() {
                 </Button>
                 <Button onClick={handleCreatePost} className="bg-primary hover:bg-primary/90">
                   Post Request
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {showDonateModal && selectedPostForDonation && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <Card className="w-full max-w-md">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <CardTitle>Donate to {selectedPostForDonation.groupName}</CardTitle>
+              <button
+                onClick={() => {
+                  setShowDonateModal(false)
+                  setSelectedPostForDonation(null)
+                  setDonationAmount("")
+                }}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">{selectedPostForDonation.title}</p>
+
+              {/* Donation Amount */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Donation Amount</label>
+                <input
+                  type="number"
+                  placeholder="Enter amount"
+                  value={donationAmount}
+                  onChange={(e) => setDonationAmount(e.target.value)}
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
+                  min="0"
+                  step="1000"
+                />
+              </div>
+
+              {/* Payment Method */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Payment Method</label>
+                <select
+                  value={donationMethod}
+                  onChange={(e) => setDonationMethod(e.target.value)}
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
+                >
+                  <option value="Mobile Money">Mobile Money</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Card">Card Payment</option>
+                </select>
+              </div>
+
+              {/* Note for admin integration */}
+              <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+                <p className="text-xs text-blue-800">
+                  This donation will be recorded and tracked for admin dashboard integration and verification.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 justify-end pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowDonateModal(false)
+                    setSelectedPostForDonation(null)
+                    setDonationAmount("")
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleDonateToPost} className="gap-2 bg-green-600 hover:bg-green-700 text-white">
+                  <DollarSign className="h-4 w-4" />
+                  Confirm Donation
                 </Button>
               </div>
             </CardContent>

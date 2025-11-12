@@ -10,8 +10,8 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "v0 App",
-  description: "Created with v0",
+  title: "Disaster Relief Portal",
+  description: "Volunteer coordination and disaster relief management system",
   generator: "v0.app",
   icons: {
     icon: [

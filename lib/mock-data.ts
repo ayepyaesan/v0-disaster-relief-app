@@ -377,6 +377,8 @@ export const helpRequestPosts = [
         timestamp: new Date("2025-11-10T15:00:00"),
       },
     ],
+    donationsReceived: 0,
+    totalDonationAmount: 0,
   },
   {
     id: "2",
@@ -399,6 +401,8 @@ export const helpRequestPosts = [
         timestamp: new Date("2025-11-10T13:30:00"),
       },
     ],
+    donationsReceived: 0,
+    totalDonationAmount: 0,
   },
   {
     id: "3",
@@ -414,6 +418,8 @@ export const helpRequestPosts = [
     image: "/assorted-water-bottles.png",
     timestamp: new Date("2025-11-10T12:15:00"),
     comments: [],
+    donationsReceived: 3,
+    totalDonationAmount: 150000,
   },
   {
     id: "4",
@@ -436,6 +442,8 @@ export const helpRequestPosts = [
         timestamp: new Date("2025-11-10T11:30:00"),
       },
     ],
+    donationsReceived: 0,
+    totalDonationAmount: 0,
   },
   {
     id: "5",
@@ -451,5 +459,80 @@ export const helpRequestPosts = [
     image: "/emergency-evacuation.jpg",
     timestamp: new Date("2025-11-10T09:45:00"),
     comments: [],
+    donationsReceived: 0,
+    totalDonationAmount: 0,
+  },
+]
+
+export const donations = [
+  {
+    id: "1",
+    amount: 50000,
+    method: "Mobile Money",
+    status: "Completed",
+    timestamp: new Date("2025-11-10T14:30:00"),
+    purpose: "Water Supply Distribution",
+  },
+  {
+    id: "2",
+    amount: 100000,
+    method: "Bank Transfer",
+    status: "Completed",
+    timestamp: new Date("2025-11-10T12:15:00"),
+    purpose: "Medical Supplies",
+  },
+  {
+    id: "3",
+    amount: 25000,
+    method: "Cash",
+    status: "Pending",
+    timestamp: new Date("2025-11-10T10:45:00"),
+    purpose: "Emergency Relief",
+  },
+]
+
+export const paymentMethods = [
+  { id: "mobile", name: "Mobile Money", icon: "Smartphone", color: "#4ECDC4", description: "Pay via mobile wallet" },
+  { id: "bank", name: "Bank Transfer", icon: "Landmark", color: "#5A67D8", description: "Direct bank transfer" },
+  { id: "cash", name: "Cash", icon: "DollarSign", color: "#48BB78", description: "In-person cash donation" },
+  { id: "card", name: "Card Payment", icon: "CreditCard", color: "#ED8936", description: "Credit/Debit card" },
+]
+
+export const donationCampaigns = [
+  {
+    id: "1",
+    title: "Emergency Water Supply",
+    target: 500000,
+    raised: 350000,
+    description: "Providing clean drinking water to 5,000+ affected people",
+    icon: "Droplet",
+    color: "#4ECDC4",
+  },
+  {
+    id: "2",
+    title: "Medical Aid Fund",
+    target: 750000,
+    raised: 520000,
+    description: "Medical supplies and emergency healthcare",
+    icon: "Heart",
+    color: "#FF6B6B",
+  },
+  {
+    id: "3",
+    title: "Food & Nutrition",
+    target: 400000,
+    raised: 280000,
+    description: "Providing nutritious meals for families in need",
+    icon: "Package",
+    color: "#FFE66D",
+  },
+  {
+    id: "4",
+    title: "Shelter & Housing",
+    target: 1000000,
+    raised: 650000,
+    description: "Temporary shelters and housing solutions",
+    icon: "Home",
+    color: "#95E1D3",
   },
 ]

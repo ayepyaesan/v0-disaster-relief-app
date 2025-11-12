@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { MapPin, Users, Package, FileText, Megaphone, User, LogOut, AlertTriangle } from "lucide-react"
+import { MapPin, Users, Package, FileText, Megaphone, User, LogOut, AlertTriangle, Heart } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 
@@ -22,6 +22,7 @@ export function Navigation() {
     { href: "/reports", label: "Reports", icon: FileText },
     { href: "/announcements", label: "Feed", icon: Megaphone },
     { href: "/safety", label: "Safety", icon: AlertTriangle },
+    { href: "/donations", label: "Donate", icon: Heart },
   ]
 
   return (
